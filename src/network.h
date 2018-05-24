@@ -3,26 +3,39 @@
 
 #include <stdlib.h>
 
+#include <x86intrin.h>
+#include "utils.h"
+
+/* typedef struct { */
+/*     double out; */
+/*     double net; */
+/*     double bias; */
+/*     double error; */
+
+/*     size_t   weights_l; */
+/*     double  *weights; */
+/* } Node; */
+
 typedef struct {
-    double out;
-    double net;
-    double bias;
-    double error;
+    size_t len;
+
+    Vec *out;
+    Vec net;
+    Vec bias;
+    Vec error;
+    /* double *out; */
+    /* double *net; */
+    /* double *bias; */
+    /* double *error; */
 
     size_t weights_l;
-    double *weights;
-} Node;
+    Vec *weights; // weights from here to next layer nodes
+    // weights[next_node][this layer]
 
-typedef struct {
-    size_t len;
-    double *values;
-} InputLayer;
-
-typedef struct {
-    size_t len;
-    Node   *nodes;
+    /* Node   *nodes; */
 } Layer;
 
+typedef Layer InputLayer;
 typedef Layer OutputLayer;
 typedef Layer HiddenLayer;
 
@@ -31,11 +44,12 @@ typedef struct {
     size_t layers_l;
     double learning_rate;
 
-    InputLayer   **input;
+    InputLayer   *input;
     OutputLayer  *output;
     HiddenLayer  *hidden;
 
-    void **layers;
+
+    Layer **layers;
     /*
      * void **layers = { **input, *hidden + i ..., *output }
      *             0 = ***InputLayer
@@ -44,15 +58,15 @@ typedef struct {
      */
 } Network;
 
-double sigma(double);
+void sigma(Vec *x, Vec *y); // output is y
 
-Node node_new(size_t weights_l);
-void node_destroy(Node *n);
-void node_initialize(Node *n);
+/* Node node_new(size_t weights_l); */
+/* void node_destroy(Node *n); */
+/* void node_initialize(Node *n); */
 
-InputLayer input_new(size_t len);
-InputLayer input_from(double *arr, size_t len);
-void input_destroy(InputLayer *in);
+/* InputLayer input_new(size_t len); */
+/* InputLayer input_from(double *arr, size_t len); */
+/* void input_destroy(InputLayer *in); */
 
 Layer layer_new(size_t len, size_t prev_len);
 void layer_destroy(Layer *l);
@@ -62,9 +76,9 @@ Network nw_new(size_t ins, size_t outs, size_t hid, size_t h_layers, double lear
 void nw_destroy(Network *nw);
 
 void nw_initialize_nodes(Network *nw);
-void nw_load_input(Network *nw, InputLayer *in);
+void nw_load_input(Network *nw, Vec *in);
 void nw_forward_pass(Network *);
-void nw_backprop(Network *, double *);
-double nw_get_total_err(Network *, double *);
+void nw_backprop(Network *, Vec *);
+double nw_get_total_err(Network *, Vec *);
 
 #endif

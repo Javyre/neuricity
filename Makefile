@@ -22,7 +22,7 @@ else
 endif
 endif
 
-CFLAGS += -Wall
+CFLAGS += -Wall -mavx2
 LDFLAGS += -lm
 
 $(BUILD_DIR)/$(TARGET_EXEC): $(OBJS)
