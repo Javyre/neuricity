@@ -10,6 +10,8 @@
 #define inspect(f, e) printf(#e"=" f "\n", e)
 #define range(i, a, b) (size_t i = a; i < b; i++)
 
+void print_arr(char *pre, size_t len, double *arr, char *post);
+
 #ifdef SIMD
 // Vector of 4 doubles
 typedef union { 

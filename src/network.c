@@ -9,15 +9,16 @@
 /*     return 1.0 / (1 + exp(-x)); */
 /* } */
 
-void sigma(Vec *x, Vec *y) {
-    Vec tmp = vec_new(y->len);
-    vec_set1(&tmp, 1.0);
+void sigma(Vec *x, Vec *y, Vec *tmp) {
+    /* Vec tmp = vec_new(y->len); */
+
+    vec_set1(tmp, 1.0);
 
     vec_nexp(x, y);
-    vec_add(&tmp, y, y);
-    vec_div(&tmp, y, y);
+    vec_add(tmp, y, y);
+    vec_div(tmp, y, y);
 
-    vec_destroy(&tmp);
+    /* vec_destroy(tmp); */
 }
 
 /* Node node_new(size_t weights_l) { */
@@ -82,6 +83,10 @@ Layer layer_new(size_t len, size_t next_len) {
     l.net   = vec_new(len);
     l.bias  = vec_new(len);
     l.error = vec_new(len);
+
+    l.tmp1  = vec_new(len);
+    l.tmp2  = vec_new(len);
+
     l.weights_l = next_len;
     l.weights = malloc(sizeof(Vec)*next_len);
     for range(i, 0, next_len) {
@@ -105,6 +110,9 @@ void layer_destroy(Layer *l) {
         vec_destroy(&l->bias);
         vec_destroy(&l->error);
 
+        vec_destroy(&l->tmp1);
+        vec_destroy(&l->tmp2);
+
         for range(i, 0, l->weights_l) {
             vec_destroy(l->weights+i);
         }
@@ -125,10 +133,13 @@ void layer_destroy(Layer *l) {
 
 }
 
-void layer_initialize_nodes(Layer *l) { 
+void layer_randomize_weights(Layer *l) {
     for range(n, 0, l->weights_l)
         vec_set_rand(l->weights+n);
 
+}
+
+void layer_randomize_biases(Layer *l) {
     vec_set_rand(&l->bias);
     /* for range(i, 0, l->len) { */
     /*     /1* node_initialize(l->nodes + i); *1/ */
@@ -210,10 +221,12 @@ void nw_destroy(Network *nw) {
 }
 
 void nw_initialize_nodes(Network *nw) {
-    for range(i, 1, nw->layers_l) {
+    for range(i, 0, nw->layers_l-1) {
         /* printf("initializing layer: %lu/%lu\n", i+1, nw->layers_l); */
 
-        layer_initialize_nodes(nw->layers[i]);
+        /* layer_initialize_nodes(nw->layers[i]); */
+        layer_randomize_weights(nw->layers[i]);
+        layer_randomize_biases(nw->layers[i+1]);
     }
 }
 
@@ -228,18 +241,20 @@ void nw_forward_pass(Network *nw) {
         Layer *curr = nw->layers[i];
 
 
-        Vec tmp = vec_new(curr->net.len);
+        /* Vec tmp = vec_new(curr->net.len); */
+        /* Vec *tmp = &curr->tmp1; */
+        Vec *tmp = &prev->tmp1;
         for range(t, 0, curr->len) {
-            vec_mul(prev->out, &prev->weights[t], &tmp);
-            vec_set_i(&curr->net, t, vec_fold(&tmp));
+            vec_mul(prev->out, &prev->weights[t], tmp);
+            vec_set_i(&curr->net, t, vec_fold(tmp));
         }
 
         vec_add(&curr->net, &curr->bias, &curr->net);
-        
-        sigma(&curr->net, curr->out);
+
+        sigma(&curr->net, curr->out, &curr->tmp2);
         /* inspect("%lf", vec_as_arr(&curr->net)[0]); */
 
-        vec_destroy(&tmp);
+        /* vec_destroy(&tmp); */
 
         /* cur->net */
         /* if (i == 0) { */ 
@@ -285,17 +300,18 @@ void nw_backprop(Network *nw, Vec *target_output) {
             vec_sub(layer->out, target_output, &layer->error);
 
             // * (1 - layer->out)
-            Vec tmp1 = vec_new(layer->len);
-            vec_set1(&tmp1, 1);
-            vec_sub(&tmp1, layer->out, &tmp1);
-            vec_mul(&tmp1, &layer->error, &layer->error);
+            /* Vec tmp1 = vec_new(layer->len); */
+            Vec *tmp1 = &layer->tmp1;
+            vec_set1(tmp1, 1);
+            vec_sub(tmp1, layer->out, tmp1);
+            vec_mul(tmp1, &layer->error, &layer->error);
 
             // * layer->out
             vec_mul(layer->out, &layer->error, &layer->error);
 
-            vec_destroy(&tmp1);
+            /* vec_destroy(&tmp1); */
         } else { 
-            Layer *next = (Layer *)*(nw->layers + i -1);
+            Layer *next = (Layer *)*(nw->layers + i +1);
             // out * (1-out) * SUM_a ( next_err * W_here_previous )
             // layer->error = 
             //      layer->out * (1 - layer->out)
@@ -305,43 +321,60 @@ void nw_backprop(Network *nw, Vec *target_output) {
             vec_sub(layer->out, target_output, &layer->error);
 
             // * (1 - layer->out)
-            Vec tmp1 = vec_new(layer->len);
-            vec_set1(&tmp1, 1);
-            vec_sub(&tmp1, layer->out, &tmp1);
-            vec_mul(&tmp1, &layer->error, &layer->error);
+            /* Vec tmp1 = vec_new(layer->len); */
+            Vec *tmp1 = &layer->tmp1;
+            vec_set1(tmp1, 1);
+            vec_sub(tmp1, layer->out, tmp1);
+            vec_mul(tmp1, &layer->error, &layer->error);
 
             /* Vec tmp2 = vec_new(layer->len); */
-
-            Vec tmp3 = vec_new(layer->len);
-            vec_set1(&tmp3, 0);
+            /* Vec tmp3 = vec_new(layer->len); */
+            Vec *tmp2 = &layer->tmp2;
+            vec_set1(tmp2, 0);
             for range(a, 0, next->len) {
-                vec_set1(&tmp1, vec_get_i(&next->error, a));
+                vec_set1(tmp1, vec_get_i(&next->error, a));
 
                 /* for range(ii, 0, layer->len) { */
                 /*     vec_set_i(&tmp2, ii, vec_get_i(&layer->weights[ii], a)); */
                 /* } */
 
                 /* vec_mul(&tmp1, &tmp2, &tmp1); */
-                vec_mul(&tmp1, &layer->weights[a], &tmp1);
+                vec_mul(tmp1, &layer->weights[a], tmp1);
 
-                vec_add(&tmp1, &tmp3, &tmp3);
+                vec_add(tmp1, tmp2, tmp2);
+
             }
-            vec_mul(&layer->error, &tmp3, &layer->error);
+            vec_mul(&layer->error, tmp2, &layer->error);
 
-            vec_destroy(&tmp1);
+            /* vec_destroy(&tmp1); */
             /* vec_destroy(&tmp2); */
-            vec_destroy(&tmp3);
+            /* vec_destroy(&tmp3); */
         }
 
         // layer->weights[t] = layer->weights[t] - layer->error * prev->out * learning_rate
-        Vec tmp1 = vec_new(layer->len);
+        /* Vec tmp1 = vec_new(layer->len); */
+        /* Vec tmp2 = vec_new(layer->len); */
+        Vec *tmp1 = &layer->tmp1;
+        Vec *tmp2 = &layer->tmp2;
+        vec_set1(tmp2, nw->learning_rate);
         for range(t, 0, layer->len) {
-            vec_set1(&tmp1, vec_get_i(&layer->error, t));
-            vec_mul(prev->out,     &tmp1, &tmp1);
-            vec_mul(&layer->error, &tmp1, &tmp1);
-            vec_sub(&prev->weights[t], &tmp1, &prev->weights[t]);
+            vec_set1(tmp1, vec_get_i(&layer->error, t));
+            vec_mul(prev->out,     tmp1, tmp1);
+            vec_mul(tmp1, tmp2, tmp1);
+            /* vec_mul(&layer->error, &tmp1, &tmp1); */
+            /* print_arr("tmp2  = ", layer->len, vec_as_arr(tmp2), "\n"); */
+
+
+            vec_sub(&prev->weights[t], tmp1, &prev->weights[t]);
         }
-        vec_destroy(&tmp1);
+        /* puts("--"); */
+
+        // layer->bias = layer->bias - layer->error * learning_rate
+        vec_mul(&layer->error, tmp2, tmp1);
+        vec_sub(&layer->bias, tmp1, &layer->bias);
+        
+        /* vec_destroy(&tmp1); */
+        /* vec_destroy(&tmp2); */
 
     }
 
@@ -394,13 +427,14 @@ void nw_backprop(Network *nw, Vec *target_output) {
 }
 
 double nw_get_total_err(Network *nw, Vec *target_output) {
-    Vec tmp = vec_new(nw->output->len);
+    /* Vec tmp = vec_new(nw->output->len); */
+    Vec *tmp = &nw->output->tmp1;
 
-    vec_sub(target_output, nw->output->out, &tmp);
-    vec_mul(&tmp, &tmp, &tmp);
-    double r = vec_fold(&tmp);
+    vec_sub(target_output, nw->output->out, tmp);
+    vec_mul(tmp, tmp, tmp);
+    double r = vec_fold(tmp);
 
-    vec_destroy(&tmp);
+    /* vec_destroy(tmp); */
     return r / 2.0;
 
     /* double sum = 0.0; */

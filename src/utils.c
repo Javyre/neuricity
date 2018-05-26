@@ -2,6 +2,19 @@
 #include <x86intrin.h>
 #include <string.h>
 #include <math.h>
+#include <stdio.h>
+
+void print_arr(char *pre, size_t len, double *arr, char *post) {
+    if (pre != NULL)
+        printf("%s", pre);
+    printf("[ ");
+    for range(i, 0, len) {
+        printf("%lf ", arr[i]);
+    }
+    printf("]");
+    if (post != NULL)
+        printf("%s", post);
+}
 
 #ifdef SIMD
 

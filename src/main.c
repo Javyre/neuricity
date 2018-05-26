@@ -9,17 +9,6 @@
 #include "network.h"
 #define data_len 2
 
-void print_arr(char *pre, size_t len, double *arr, char *post) {
-    if (pre != NULL)
-        printf("%s", pre);
-    printf("[ ");
-    for range(i, 0, len) {
-        printf("%lf ", arr[i]);
-    }
-    printf("]");
-    if (post != NULL)
-        printf("%s", post);
-}
 
 void gen_arrays(size_t len, double *dest_a, double *dest_b) {
     for range(i, 0, len) {
@@ -44,7 +33,10 @@ void test_simd() {
     vec_set(&x, arr);
     vec_mul(&v, &x, &o);
     /* vec_nexp(&o, &o); */
-    sigma(&o, &o);
+
+    Vec tmp = vec_new(10);
+    sigma(&o, &o, &tmp);
+    vec_destroy(&tmp);
 
     /* vec_to_arr(&o, arr); */
     double *out = vec_as_arr(&o);
@@ -54,19 +46,55 @@ void test_simd() {
     vec_destroy(&v);
     vec_destroy(&x);
     vec_destroy(&o);
+}
 
-    /* Vec4d v = { .arr = { 1, 2, 3, 4 } }; */
-    /* Vec4d x = { .arr = { 1, 2, 3, 4 } }; */
-    /* Vec4d o = { 0 }; */
+void test_simple() {
+    srand(time(NULL));
 
-    /* print_arr("v: ", 4, v.arr, "\n"); */
+    Network net = nw_new(data_len, data_len, 2, 1, 0.5);
 
-    /* o.vec = _mm256_mul_pd(v.vec, x.vec); */
-    /* /1* for range(i, 0, 4) { *1/ */
-    /* /1*     o.arr[i] = v.arr[i] * x.arr[i]; *1/ */
-    /* /1* } *1/ */
+    Vec *input_vec = malloc(sizeof(Vec));
+    *input_vec = vec_new(data_len);
+    Vec output_vec = vec_new(data_len);
+    double *input  = vec_as_arr(input_vec);
+    double *output = vec_as_arr(&output_vec);
 
-    /* print_arr("o: ", 4, o.arr, "\n"); */
+    nw_load_input(&net, input_vec);
+
+    input[0] = 0.05;
+    input[1] = 0.10;
+    output[0] = 0.01;
+    output[1] = 0.99;
+
+    vec_as_arr(&net.hidden->bias)[0] = 0.35;
+    vec_as_arr(&net.hidden->bias)[1] = 0.35;
+
+    vec_as_arr(&net.output->bias)[0] = 0.60;
+    vec_as_arr(&net.output->bias)[1] = 0.60;
+
+    vec_as_arr(&net.input->weights[0])[0] = 0.15;
+    vec_as_arr(&net.input->weights[0])[1] = 0.20;
+    vec_as_arr(&net.input->weights[1])[0] = 0.25;
+    vec_as_arr(&net.input->weights[1])[1] = 0.30;
+
+    vec_as_arr(&net.hidden->weights[0])[0] = 0.40;
+    vec_as_arr(&net.hidden->weights[0])[1] = 0.45;
+    vec_as_arr(&net.hidden->weights[1])[0] = 0.50;
+    vec_as_arr(&net.hidden->weights[1])[1] = 0.55;
+
+    nw_forward_pass(&net);
+    print_arr("i:  ", 2, input, "\n");
+    print_arr("to: ", 2, output, "\n");
+    print_arr("o:  ", 2, vec_as_arr(net.output->out), "\n");
+
+    nw_backprop(&net, &output_vec);
+    print_arr("wi: ", 2, vec_as_arr(&net.input->weights[0]), "\n");
+    print_arr("wi: ", 2, vec_as_arr(&net.input->weights[1]), "\n");
+    print_arr("wh: ", 2, vec_as_arr(&net.hidden->weights[0]), "\n");
+    print_arr("wh: ", 2, vec_as_arr(&net.hidden->weights[1]), "\n");
+
+    vec_destroy(&output_vec);
+    nw_destroy(&net);
 }
 
 int main(int argc, char** argv) {
@@ -94,7 +122,8 @@ int main(int argc, char** argv) {
     nw_initialize_nodes(&net);
     nw_load_input(&net, input_vec);
 
-    double max_err = 0.0;
+
+    /* double max_err = 1.0; */
     size_t tt = 0;
     for range(c, 0, 1000) {
         gen_arrays(data_len, input, output);
@@ -104,29 +133,38 @@ int main(int argc, char** argv) {
         print_arr("target out: ", data_len, output, "\n");
 #endif
 
-        for range(t, 0, 700) {
+        for range(t, 0, 100) {
             nw_forward_pass(&net);
+
+
             nw_backprop(&net, &output_vec);
 
 #ifdef GRAPH_MODE
-            if (t == 0) {
-                max_err = nw_get_total_err(&net, &output_vec);
-            }
+            /* if (t == 0) { */
+            /*     max_err = nw_get_total_err(&net, &output_vec); */
+            /* } */
+
+            /* if (max_err < 0.005) { */
+            /*     tt += 400-1; */
+            /*     break; */
+            /* } */
+
             printf("%lu\t"
                    "%lu\t"
                    "%lu\t"
-                   "%lf\t"
+                   /* "%lf\t" */
                    "%lf\n",
                    tt,
                    c,
                    t,
-                   nw_get_total_err(&net, &output_vec),
-                   max_err
+                   nw_get_total_err(&net, &output_vec)
+                   /* max_err */
                    );
             /* } */
 #endif
             tt++;
         }
+        puts("");
 
 #ifndef GRAPH_MODE
         nw_forward_pass(&net);

@@ -28,6 +28,9 @@ typedef struct {
     /* double *bias; */
     /* double *error; */
 
+    Vec tmp1;
+    Vec tmp2;
+
     size_t weights_l;
     Vec *weights; // weights from here to next layer nodes
     // weights[next_node][this layer]
@@ -58,7 +61,7 @@ typedef struct {
      */
 } Network;
 
-void sigma(Vec *x, Vec *y); // output is y
+void sigma(Vec *x, Vec *y, Vec *tmp); // output is y
 
 /* Node node_new(size_t weights_l); */
 /* void node_destroy(Node *n); */
@@ -70,7 +73,8 @@ void sigma(Vec *x, Vec *y); // output is y
 
 Layer layer_new(size_t len, size_t prev_len);
 void layer_destroy(Layer *l);
-void layer_initialize_nodes(Layer *l);
+void layer_randomize_weights(Layer *l);
+void layer_randomize_biases(Layer *l);
 
 Network nw_new(size_t ins, size_t outs, size_t hid, size_t h_layers, double learning_rate);
 void nw_destroy(Network *nw);
